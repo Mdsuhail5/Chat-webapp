@@ -25,8 +25,8 @@ export default function Chat() {
     // Backend expects { content, chatId, senderId }
     socket.emit("send_message", {
       content: message,
-      chatId: "default-chat",     // Dummy ID for now
-      senderId: "default-user"    // Dummy ID for now
+      chatId: "chat_id_1",     // Dummy ID for now
+      senderId: "id_2"    // Dummy ID for now
     });
     setMessage("");
   };
