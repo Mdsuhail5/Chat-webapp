@@ -1,0 +1,32 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma" // ✅ inside src, resolves correctly after compile
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Chat {
+  id        String    @id
+  isGroup   Boolean   @default(false)
+  createdAt DateTime  @default(now())
+  Message   Message[]
+}
+
+model Message {
+  id        String   @id @default(uuid()) // ✅ Prisma generates the UUID
+  content   String
+  chatId    String
+  senderId  String
+  createdAt DateTime @default(now())
+  Chat      Chat     @relation(fields: [chatId], references: [id])
+  User      User     @relation(fields: [senderId], references: [id])
+}
+
+model User {
+  id        String    @id
+  name      String
+  createdAt DateTime  @default(now())
+  Message   Message[]
+}
