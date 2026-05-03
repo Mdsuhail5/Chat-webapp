@@ -20,6 +20,7 @@ model Message {
   content   String
   chatId    String
   senderId  String
+  status    String   @default("sent")
   createdAt DateTime @default(now())
   Chat      Chat     @relation(fields: [chatId], references: [id])
   User      User     @relation(fields: [senderId], references: [id])

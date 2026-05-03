@@ -27,7 +27,8 @@ interface MessageData {
 })
 export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   constructor(private prisma: PrismaService) { }
-
+  private onlineUsers = new Map<string, string>();
+  // userId -> socketId
   // ✅ Fix: definite assignment
   @WebSocketServer()
   server!: Server;
@@ -38,6 +39,28 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   handleDisconnect(client: Socket) {
     console.log('User disconnected:', client.id);
+    for (const [userId, socketId] of this.onlineUsers.entries()) {
+      if (socketId === client.id) {
+        this.onlineUsers.delete(userId);
+      }
+    }
+    this.server.emit("online_users", Array.from(this.onlineUsers.keys()));
+  }
+
+  @SubscribeMessage("user_online")
+  handleUserOnline(
+    @MessageBody() userId: string,
+    @ConnectedSocket() client: Socket
+  ) {
+    this.onlineUsers.set(userId, client.id);
+    this.server.emit("online_users", Array.from(this.onlineUsers.keys()));
+  }
+
+  @SubscribeMessage("typing")
+  handleTyping(
+    @MessageBody() data: { chatId: string; senderId: string }
+  ) {
+    this.server.emit("typing", data);
   }
 
   @SubscribeMessage('send_message')
@@ -60,14 +83,34 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     });
 
     // ✅ Strongly typed Prisma result
-    const message: Message = await this.prisma.message.create({
+    const message = await this.prisma.message.create({
       data: {
-        id: randomUUID(), // ✅ required — no @default(uuid()) in schema
         content,
         chatId,
         senderId,
+        status: "sent",
+      },
+      include: {
+        User: true, // 🔥 THIS FIXES YOUR UI
       },
     });
-    this.server.emit('receive_message', message);
+    this.server.emit("receive_message", message);
+
+    // 🔥 update to delivered
+    await this.prisma.message.update({
+      where: { id: message.id },
+      data: { status: "delivered" },
+    });
+  }
+  @SubscribeMessage("mark_read")
+  async handleRead(@MessageBody() data: any) {
+    const { chatId } = data;
+
+    await this.prisma.message.updateMany({
+      where: { chatId },
+      data: { status: "read" },
+    });
+
+    this.server.emit("messages_read", chatId);
   }
 }
